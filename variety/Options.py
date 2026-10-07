@@ -28,7 +28,9 @@ TRUTH_VALUES = ["enabled", "1", "true", "on", "yes"]
 
 
 class Options:
-    OUTDATED_HASHES = {"clock_filter": ["dca6bd2dfa2b8c4e2db8801e39208f7f", "a565a0c34a1358af4fb040d30cca6933"]}
+    OUTDATED_HASHES = {
+        "clock_filter": ["dca6bd2dfa2b8c4e2db8801e39208f7f", "a565a0c34a1358af4fb040d30cca6933"]
+    }
     SIMPLE_DOWNLOADERS = []  # set by VarietyWindow at start
     IMAGE_SOURCES = []  # set by VarietyWindow at start
     CONFIGURABLE_IMAGE_SOURCES = []  # set by VarietyWindow at start
@@ -512,6 +514,13 @@ class Options:
             except Exception:
                 pass
 
+            try:
+                self.water_daily_goal = float(config["water_daily_goal"])
+                self.water_log_amount = float(config["water_log_amount"])
+                self.water_reminder_interval = float(config["water_reminder_interval"])
+            except Exception:
+                pass
+
             self.sources = []
             if "sources" in config:
                 sources = config["sources"]
@@ -730,6 +739,10 @@ class Options:
         self.slideshow_fade = 0.4
         self.slideshow_zoom = 0.2
         self.slideshow_pan = 0.05
+
+        self.water_daily_goal = 2.0
+        self.water_log_amount = 0.250
+        self.water_reminder_interval = 3600
 
         self.sources = [
             [True, Options.SourceType.FAVORITES, "The Favorites folder"],

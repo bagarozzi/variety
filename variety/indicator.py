@@ -18,8 +18,10 @@
 
 import logging
 import os
+import json
+import datetime
 
-from gi.repository import Gtk  # pylint: disable=E0611
+from gi.repository import Gtk, GLib  # pylint: disable=E0611
 
 from variety.Util import Util, _
 from variety_lib import varietyconfig
@@ -42,6 +44,19 @@ try:
 
         _indicator_backend = "AppIndicator3"
     use_appindicator = True
+
+    try:
+        gi.require_version("Notify", "0.7")
+        from gi.repository import Notify
+
+        Notify.init("Variety-Hydration")
+        HAS_NOTIFY = True
+    except (ImportError, ValueError):
+        HAS_NOTIFY = False
+        import logging
+
+        logger = logging.getLogger("variety")
+        logger.warning("Notify library not found. Hydration tracker disabled.")
 except (ValueError, ImportError):
     _indicator_backend = "fallback tray"
     use_appindicator = False
@@ -293,6 +308,17 @@ class Indicator:
 
         self.menu.append(Gtk.SeparatorMenuItem.new())
 
+        if HAS_NOTIFY:
+            self.hydration = window.hydration
+            self.water_item = Gtk.MenuItem(
+                label=f"💧 Water Intake: {self.hydration.water_amount} / {self.hydration.daily_goal} L"
+            )
+            self.water_item.connect("activate", self.log_water_directly)
+            self.menu.append(self.water_item)
+            GLib.timeout_add_seconds(self.hydration.interval, self.trigger_water_prompt)
+
+        self.menu.append(Gtk.SeparatorMenuItem.new())
+
         self.preferences = Gtk.MenuItem(_("Preferences..."))
         self.preferences.connect("activate", window.on_mnu_preferences_activate)
         self.menu.append(self.preferences)
@@ -409,6 +435,51 @@ class Indicator:
 
     def get_visible(self):
         return self.visible
+
+    def trigger_water_prompt(self, widget=None):
+        if not HAS_NOTIFY:
+            return
+        self.water_notification = Notify.Notification.new(
+            "Hydration Check", "Time to drink a glass of water!", "dialog-information"
+        )
+        self.water_notification.add_action(
+            "drink", f"Drink {self.hydration.log_amount} L", self._apply_drink, None
+        )
+        self.water_notification.show()
+        return True
+
+    def _apply_drink(self, *args):
+        self.hydration.log_drink()
+        self.water_item.set_label(
+            f"💧 Water Intake: {self.hydration.water_amount} / {self.hydration.daily_goal} L"
+        )
+
+    def log_water_directly(self, widget=None):
+        self._apply_drink()
+        if hasattr(self, "timer_id"):
+            GLib.source_remove(self.timer_id)
+        self.timer_id = GLib.timeout_add_seconds(self.hydration.interval, self.trigger_water_prompt)
+        if HAS_NOTIFY:
+            hours = self.hydration.interval // 3600
+            minutes = (self.hydration.interval % 3600) // 60
+
+            time_parts = []
+            if hours > 0:
+                time_parts.append(f"{hours}h")
+            if minutes > 0:
+                time_parts.append(f"{minutes}m")
+            time_str = "".join(time_parts) if time_parts else "a few seconds"
+            confirm = Notify.Notification.new(
+                "Water Logged",
+                f"Intake updated to {self.hydration.water_amount} L. Next reminder in {time_str}.",
+                "dialog-information",
+            )
+            confirm.show()
+
+    def save_water_data(self):
+        data = {"date": datetime.date.today().isoformat(), "amount": self.water_amount}
+        with open(self.water_file, "w") as f:
+            json.dump(data, f)
 
 
 def new_application_indicator(window):
