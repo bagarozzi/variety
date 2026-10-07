@@ -35,6 +35,7 @@ from PIL import Image as PILImage
 
 from jumble.Jumble import Jumble
 from variety import indicator
+from variety.Hydration import HydrationManager
 from variety.AboutVarietyDialog import AboutVarietyDialog
 from variety.DominantColors import DominantColors
 from variety.ImageFetcher import ImageFetcher
@@ -168,6 +169,7 @@ class VarietyWindow(Gtk.Window):
         self.load_banned()
         self.load_last_change_time()
         self.update_indicator(auto_changed=False)
+        self.hydration = HydrationManager(self.options)
 
         self.start_threads()
 
@@ -1304,15 +1306,14 @@ class VarietyWindow(Gtk.Window):
     @staticmethod
     @functools.cache
     def resolve_font_path(font_name):
-        cmd = ['fc-match', '-f', '%{file[0]}', font_name]
+        cmd = ["fc-match", "-f", "%{file[0]}", font_name]
         result = subprocess.run(cmd, check=False, text=True, stdout=subprocess.PIPE)
         font_file = ""
         if result.returncode == 0:
             font_file = result.stdout
         else:
             logger.warning(
-                lambda: f"Could not find font {font_name!r}. "
-                f"Exit code: {result.returncode}"
+                lambda: f"Could not find font {font_name!r}. " f"Exit code: {result.returncode}"
             )
         return font_file
 
@@ -1448,7 +1449,12 @@ class VarietyWindow(Gtk.Window):
                 target_file = os.path.join(
                     self.wallpaper_folder, "wallpaper-zoomed-%s.jpg" % Util.random_hash()
                 )
-                cmd = [self.get_magick_cmd(), to_set, *shlex.split(mode_data.imagemagick_cmd), target_file]
+                cmd = [
+                    self.get_magick_cmd(),
+                    to_set,
+                    *shlex.split(mode_data.imagemagick_cmd),
+                    target_file,
+                ]
                 logger.info(lambda: f"ImageMagick display mode cmd: {cmd}")
 
                 result = subprocess.run(cmd, check=False)
@@ -1579,7 +1585,9 @@ class VarietyWindow(Gtk.Window):
 
                 self.set_desktop_wallpaper(to_set, filename, refresh_level, display_mode_param)
                 if self.options.change_lock_screen:
-                    self.set_desktop_wallpaper(to_set, filename, refresh_level, display_mode_param, lock_screen=True)
+                    self.set_desktop_wallpaper(
+                        to_set, filename, refresh_level, display_mode_param, lock_screen=True
+                    )
                 self.current = filename
 
                 if self.options.icon == "Current" and self.current:
@@ -2781,8 +2789,14 @@ class VarietyWindow(Gtk.Window):
         except Exception:
             logger.exception(lambda: "Cannot remove all old wallpaper files from %s:" % folder)
 
-    def set_desktop_wallpaper(self, wallpaper, original_file, refresh_level, display_mode, lock_screen=False):
-        script = self.options.set_lock_screen_script if lock_screen else self.options.set_wallpaper_script
+    def set_desktop_wallpaper(
+        self, wallpaper, original_file, refresh_level, display_mode, lock_screen=False
+    ):
+        script = (
+            self.options.set_lock_screen_script
+            if lock_screen
+            else self.options.set_wallpaper_script
+        )
         if os.access(script, os.X_OK):
             auto = (
                 "manual"
