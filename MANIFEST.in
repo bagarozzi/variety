@@ -1,0 +1,3 @@
+include variety.desktop
+include variety/plugins/builtin/quotes/quotes.txt
+recursive-include data *
