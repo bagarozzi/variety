@@ -1,0 +1,36 @@
+name: Upstream Sync (Rebase)
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs on sundays at 2:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  rebase-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git config
+        run: |
+          git config user.name "baghinator[bot]"
+          git config user.email "baghinator[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/varietywalls/variety.git
+
+      - name: Fetch upstream
+        run: git fetch upstream master
+
+      - name: Rebase and Push
+        run: |
+          git rebase upstream/master
+          # --force-with-lease is safer than --force, preventing accidental overwrites 
+          # if you pushed new commits to your fork while the action was running
+          git push origin master --force-with-lease
